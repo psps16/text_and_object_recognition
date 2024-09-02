@@ -92,6 +92,7 @@ if ctx.video_processor:
             audio_bytes = open(audio_file, 'rb').read()
             st.audio(audio_bytes, format='audio/mp3')
             os.remove(audio_file)
+
             
 st.markdown("---")
 st.write("Developed by [Pranav bhat and Siddarth B S]")
