@@ -5,5 +5,9 @@ pytesseract>=0.3.10
 gtts>=2.3.0
 ultralytics>=8.0.0
 streamlit-webrtc
+streamlit
+streamlit-webrtc
+aioice
+asyncio
 
 
