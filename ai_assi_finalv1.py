@@ -12,7 +12,7 @@ from streamlit_webrtc import VideoTransformerBase, webrtc_streamer
 model = YOLO('yolov8n.pt')
 
 # Set up Tesseract command path (update to your path)
-pytesseract.pytesseract.tesseract_cmd = r'/app/.apt/usr/bin/tesseract'  # Adjust for Streamlit Cloud
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'  # Adjust for Streamlit Cloud
 
 class VideoProcessor(VideoTransformerBase):
     def __init__(self):
