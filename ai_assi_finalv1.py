@@ -12,7 +12,7 @@ from ultralytics import YOLO
 model = YOLO('yolov8n.pt')
 
 # Set up Tesseract command path (update to your path)
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'  # Update this path
+pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract' # Update this path
 
 RTC_CONFIGURATION = RTCConfiguration({
     "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
