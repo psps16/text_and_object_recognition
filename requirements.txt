@@ -4,4 +4,6 @@ numpy<2.0.0,>=1.23.0
 pytesseract>=0.3.10
 gtts>=2.3.0
 ultralytics>=8.0.0
+streamlit-webrtc
+
 
