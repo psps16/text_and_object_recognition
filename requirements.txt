@@ -1,0 +1,8 @@
+streamlit
+opencv-python
+numpy
+pytesseract
+gtts
+ultralytics
+os
+tempfile
