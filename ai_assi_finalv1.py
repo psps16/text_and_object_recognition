@@ -12,7 +12,7 @@ from ultralytics import YOLO
 model = YOLO('yolov8n.pt')
 
 # Set up Tesseract command path (update to your path)
-pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract' # Update this path
+pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract'   # Update this path
 
 RTC_CONFIGURATION = RTCConfiguration({
     "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
@@ -21,20 +21,21 @@ RTC_CONFIGURATION = RTCConfiguration({
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         self.model = model
+        self.detected_objects = []
 
     def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
 
         # Object detection
         results = self.model(img)
+        self.detected_objects = []  # Reset the list for each new frame
         annotated_frame = img.copy()
-        detected_objects = []
 
         for result in results:
             for box in result.boxes:
                 x1, y1, x2, y2 = box.xyxy[0].numpy()
                 cls = self.model.names[int(box.cls)]
-                detected_objects.append(cls)
+                self.detected_objects.append(cls)
                 annotated_frame = cv2.rectangle(
                     annotated_frame, 
                     (int(x1), int(y1)), 
