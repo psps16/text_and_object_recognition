@@ -1,125 +1,109 @@
 import streamlit as st
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, WebRtcMode, ClientSettings
 import cv2
 import numpy as np
 import pytesseract
 from gtts import gTTS
-import os
 import tempfile
+import os
 from ultralytics import YOLO
+import av
 
-# Load the YOLOv8 model
-model = YOLO('yolov8n.pt')
+st.set_page_config(page_title="AI Audio Assistant", page_icon="🤖")
 
-# Set up Tesseract command path (update to your path)
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'  # Update this path
-
-def detect_objects(frame):
-    try:
-        results = model(frame)
-        return results
-    except Exception as e:
-        st.error(f"Error in object detection: {str(e)}")
-        return None
-
-def recognize_text(frame):
-    text = pytesseract.image_to_string(frame)
-    return text
-
-def speak_text(text):
-    tts = gTTS(text=text, lang='en')
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as f:
-        tts.save(f.name)
-        return f.name
-
-st.title("AI Audio Assistant")
+st.title("🤖 AI Audio Assistant")
 st.write("This app performs real-time object detection and text recognition.")
 
-# Initialize state
-if 'previous_detected_objects' not in st.session_state:
-    st.session_state.previous_detected_objects = []
-if 'run' not in st.session_state:
-    st.session_state.run = False
+# Load the YOLOv8 model
+@st.cache_resource
+def load_model():
+    model = YOLO('yolov8n.pt')
+    return model
 
-# Real-time video processing (camera input)
-st.write("Real-time Video Processing")
+model = load_model()
 
-start_button = st.button("Start Detection")
-stop_button = st.button("Stop Detection")
+# Set up pytesseract
+pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract'  # Update this path if needed
 
-FRAME_WINDOW = st.image([])
-cap = cv2.VideoCapture(0)
+class VideoProcessor(VideoTransformerBase):
+    def __init__(self):
+        self.previous_detected_objects = set()
+        self.model = model
 
-if not cap.isOpened():
-    st.error("Unable to access the camera")
-else:
-    if start_button:
-        st.session_state.run = True
+    def recv(self, frame):
+        img = frame.to_ndarray(format="bgr24")
 
-    if stop_button:
-        st.session_state.run = False
-        cap.release()
-        cv2.destroyAllWindows()
+        # Object Detection
+        results = self.model(img)
+        annotated_frame = img.copy()
+        detected_objects = set()
 
-    while st.session_state.run:
-        ret, frame = cap.read()
-        if not ret:
-            st.error("Failed to capture image")
-            break
+        for result in results:
+            boxes = result.boxes
+            if boxes is not None:
+                for box in boxes:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    cls_id = int(box.cls[0])
+                    confidence = box.conf[0]
+                    label = self.model.names[cls_id]
+                    detected_objects.add(label)
 
-        # Detect objects
-        results = detect_objects(frame)
-        if results:
-            annotated_frame = frame.copy()
-            detected_objects = []
-            for result in results:
-                for box in result.boxes:
-                    x1, y1, x2, y2 = box.xyxy[0].numpy()
-                    cls = model.names[int(box.cls)]
-                    detected_objects.append(cls)
-                    annotated_frame = cv2.rectangle(
-                        annotated_frame, 
-                        (int(x1), int(y1)), 
-                        (int(x2), int(y2)), 
-                        (0, 255, 0), 2
-                    )
-                    annotated_frame = cv2.putText(
-                        annotated_frame, 
-                        cls, 
-                        (int(x1), int(y1) - 10), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 
-                        0.9, 
-                        (36, 255, 12), 
-                        2
-                    )
+                    # Draw bounding box and label
+                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(annotated_frame, f"{label} {confidence:.2f}", (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-        # Recognize text
-        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        text = recognize_text(gray_frame)
+        # Text Recognition
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        text = pytesseract.image_to_string(gray)
+        text = text.strip()
 
-        # Display the frame
-        FRAME_WINDOW.image(annotated_frame, channels="BGR")
+        # Audio Feedback for Detected Objects
+        new_objects = detected_objects - self.previous_detected_objects
+        if new_objects:
+            object_text = ", ".join(new_objects)
+            self.speak_text(f"Detected objects: {object_text}", "object_audio.mp3")
+            audio_file = open("object_audio.mp3", "rb")
+            audio_bytes = audio_file.read()
+            st.audio(audio_bytes, format='audio/mp3')
+            audio_file.close()
+            os.remove("object_audio.mp3")
+            self.previous_detected_objects = detected_objects
 
-        # Provide audio feedback for detected objects and text
+        # Audio Feedback for Detected Text
         if text:
-            st.write(f"Detected Text: {text}")
-            audio_file = speak_text(text)
-            audio_bytes = open(audio_file, 'rb').read()
+            self.speak_text(f"Detected text: {text}", "text_audio.mp3")
+            audio_file = open("text_audio.mp3", "rb")
+            audio_bytes = audio_file.read()
             st.audio(audio_bytes, format='audio/mp3')
-            os.remove(audio_file)
+            audio_file.close()
+            os.remove("text_audio.mp3")
+            st.write(f"**Detected Text:** {text}")
 
-        if detected_objects and detected_objects != st.session_state.previous_detected_objects:
-            object_text = ", ".join(detected_objects)
-            st.write(f"Detected Objects: {object_text}")
-            audio_file = speak_text(f"Detected objects: {object_text}")
-            audio_bytes = open(audio_file, 'rb').read()
-            st.audio(audio_bytes, format='audio/mp3')
-            os.remove(audio_file)
-            st.session_state.previous_detected_objects = detected_objects
+        return av.VideoFrame.from_ndarray(annotated_frame, format="bgr24")
 
-        if not st.session_state.run:
-            break
+    @staticmethod
+    def speak_text(text, filename):
+        tts = gTTS(text=text, lang='en')
+        tts.save(filename)
 
-    cap.release()
-    cv2.destroyAllWindows()
+# WebRTC Client Settings
+WEBRTC_CLIENT_SETTINGS = ClientSettings(
+    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+    media_stream_constraints={
+        "video": True,
+        "audio": False,
+    },
+)
 
-st.write("Stop the camera by clicking the 'Stop Detection' button.")
+webrtc_ctx = webrtc_streamer(
+    key="ai-audio-assistant",
+    mode=WebRtcMode.SENDRECV,
+    client_settings=WEBRTC_CLIENT_SETTINGS,
+    video_processor_factory=VideoProcessor,
+    media_stream_constraints={"video": True, "audio": False},
+    async_processing=True,
+)
+
+st.markdown("---")
+st.write("Developed by [Pranav Bhat and Siddarth B S]")
