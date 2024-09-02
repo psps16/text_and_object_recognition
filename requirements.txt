@@ -6,3 +6,5 @@ gtts
 ultralytics
 os
 tempfile
+opencv-python==4.8.1.78
+opencv-python-headless==4.8.0.74
