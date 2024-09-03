@@ -31,7 +31,7 @@ def speak_text(text):
         tts.save(f.name)
         return f.name
 
-st.title("AI Audio Assistant")
+st.title("AI Assistant for Blind people")
 st.write("This app performs real-time object detection and text recognition.")
 
 # Initialize state
